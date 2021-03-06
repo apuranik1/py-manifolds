@@ -77,7 +77,7 @@ class Cotangent(Generic[P]):
         def convert_coords(c):
             return self.chart.point_to_coords(chart.coords_to_point(c))
 
-        _, pullback_fun = jax.vjp(convert_coords, [image])
+        _, pullback_fun = jax.vjp(convert_coords, image)
         cotangent = pullback_fun(self.v_coords)
         return Cotangent(chart, image, cotangent)
 
@@ -100,8 +100,8 @@ class Tensor(Generic[P]):
     def n_indices(self) -> int:
         return len(self.t_coords.shape)
 
-    def tensor(self, other: "Tensor[P]") -> "Tensor[P]":
-        """Add two tensors at the same point in the same chart.
+    def tensorprod(self, other: "Tensor[P]") -> "Tensor[P]":
+        """Tensor product of two tensors at the same point in the same chart.
         Equality of points and charts is not checked.
         """
         unordered_tensor = jnp.tensordot(self.t_coords, other.t_coords, 0)
@@ -146,7 +146,7 @@ class Metric(Generic[P]):
     matrix: np.ndarray
 
 
-class RiemannManifold(Manifold[P]):
+class RiemannianManifold(Manifold[P]):
     """A Riemannian manifold equipped with a metric"""
 
     @abc.abstractmethod
