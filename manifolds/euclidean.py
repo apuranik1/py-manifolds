@@ -9,6 +9,7 @@ class EuclideanPoint:
     def __init__(self, coords: np.ndarray):
         self.coords = coords
 
+
 class IdChart(Chart[EuclideanPoint]):
     """Identity chart, mapping points to themselves"""
 
