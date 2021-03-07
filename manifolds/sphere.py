@@ -1,9 +1,15 @@
-from typing import Sequence, Optional
+from typing import Sequence
 
 import numpy as np
 import jax.numpy as jnp
 
-from manifolds.manifold import Chart, Manifold
+from manifolds.euclidean import EuclideanPoint, EuclideanSpace
+from manifolds.manifold import Chart, ChartPoint
+from manifolds.riemannian import (
+    PseudoMetric,
+    PseudoRiemannianManifold,
+    metric_of_immersion,
+)
 
 
 class SpherePoint:
@@ -65,9 +71,16 @@ class StereographicChart(Chart[SpherePoint]):
         return f"StereographicChart({self.signed_radius})"
 
 
-class Sphere(Manifold):
+def sphere_embedding(p: SpherePoint) -> EuclideanPoint:
+    return EuclideanPoint(p.coords)
+
+
+class Sphere(PseudoRiemannianManifold[SpherePoint]):
     def __init__(self, radius: float) -> None:
         self.radius = jnp.array(radius, dtype=jnp.float32)
+        self._metric_impl = metric_of_immersion(
+            sphere_embedding, self, EuclideanSpace()
+        )
 
     def northpole_chart(self):
         return StereographicChart(self.radius)
@@ -87,6 +100,14 @@ class Sphere(Manifold):
     def preferred_chart(self, point: SpherePoint) -> StereographicChart:
         signed_radius = jnp.where(point.coords[-1] >= 0, -self.radius, self.radius)
         return StereographicChart(signed_radius)
+
+    def metric(self, point: SpherePoint) -> PseudoMetric[SpherePoint]:
+        return self._metric_impl(point)
+
+    def metric_in_chart(
+        self, point: ChartPoint[SpherePoint]
+    ) -> PseudoMetric[SpherePoint]:
+        return super().metric_in_chart(point)
 
     def __repr__(self) -> str:
         return f"Sphere({self.radius})"

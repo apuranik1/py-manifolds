@@ -3,16 +3,23 @@
 All tangent spaces are expressed in the coordinate basis of a chart. Which chart will be
 clear from context.
 
+Elements of a tangent space are always tied to a point and a chart. Operations are only
+well-defined between elements of the same tangent space. Equality of points and charts
+is never checked; it is up to the user to ensure that invalid operations are not
+attempted, and that tensors are converted to the correct chart before use.
+
 As many functions as possible are jit-friendly.
 """
 
 import abc
 from dataclasses import dataclass
-from typing import Callable, Generic, Sequence, Tuple, TypeVar
+from typing import Callable, Generic, Sequence, TypeVar
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+
+from manifolds.util import assert_shape
 
 
 # P = generic Point type. Must not break differentiability.
@@ -73,29 +80,34 @@ class ChartPoint(Generic[P]):
     def of_point(point: P, chart: Chart[P]) -> "ChartPoint[P]":
         return ChartPoint(chart.point_to_coords(point), chart)
 
+    def to_point(self) -> P:
+        return self.chart.coords_to_point(self.coords)
 
+
+# more variables for points
 P_ = TypeVar("P_")
-
-
 T = TypeVar("T")
 T_ = TypeVar("T_")
 
 
-@dataclass(frozen=True)
 class Diffeomorphism(Generic[P, P_]):
     """A diffeomorphism between manifolds, expressed as a smooth map"""
 
-    forward: Callable[[P], P_]
-    backward: Callable[[P_], P]
-
-    # mypy breaks if we try to reuse P and P_ as typevars here
+    def __init__(self, forward: Callable[[P], P_], backward: Callable[[P_], P]):
+        self.forward = forward
+        self.backward = backward
 
     def inverse(self: "Diffeomorphism[T, T_]") -> "Diffeomorphism[T_, T]":
         result = Diffeomorphism(forward=self.backward, backward=self.forward)
         return result
 
+    def __repr__(self) -> str:
+        return f"Diffeomorphism({self.forward}, {self.backward})"
+
     @staticmethod
     def identity() -> "Diffeomorphism[T, T]":
+        """Identity diffeomorphism"""
+
         def ident(x):
             return x
 
@@ -123,6 +135,10 @@ class Tensor(Generic[P]):
 
     def tensor_prod(self, other: "Tensor[P]") -> "Tensor[P]":
         """Tensor product of two tensors at the same ChartPoint.
+
+        The resulting tensor has contravariant indices of self before the
+        contravariant indices of other, and likewise for the covariant indices.
+
         Equality of points and charts is not checked.
         """
         unordered_tensor = jnp.tensordot(self.t_coords, other.t_coords, 0)
@@ -148,7 +164,11 @@ class Tensor(Generic[P]):
         return Tensor(self.point, coords, self.n_contra - 1)
 
     def contract(self, contra_index: int, other: "Tensor[P]", cov_index: int):
-        """Contract a contravariant index of self with a covariant index of other"""
+        """Contract a contravariant index of self with a covariant index of other.
+
+        The contracted indices are removed. The order of the remaining indices is as in
+        tensor_prod.
+        """
         # it would be easier to implement this as tensor_prod then trace
         if contra_index < 0 or contra_index > self.n_contra:
             raise ValueError(f"contra_index out of bounds: {contra_index}")
@@ -197,7 +217,7 @@ class Tensor(Generic[P]):
         image = coord_map_forward(self.point.coords)
         jacobian_backward = jax.jacfwd(coord_map_backward)(image)
         # at every step, we contract the first index of tensor
-        # the indices we're done transforming are appended, so they end in the right order
+        # transformed index is appended as last index so they end in the right order
         transformed_t = self.t_coords
         for _ in range(self.n_contra):
             # transform contravariant index by pulling back
@@ -215,8 +235,10 @@ class Tensor(Generic[P]):
 
         return Tensor(ChartPoint(image, chart), transformed_t, self.n_contra)
 
-    def to_chart(self, chart: Chart[P]):
-        return self.diffeo_pushforward(Diffeomorphism.identity(), chart)
+    def to_chart(self, chart: Chart[P]) -> "Tensor[P]":
+        # mypy gets this right, but pyright doesn't
+        ident: Diffeomorphism[P, P] = Diffeomorphism.identity()  # type: ignore
+        return self.diffeo_pushforward(ident, chart)
 
 
 class CovariantTensor(Tensor[P]):
@@ -301,6 +323,11 @@ class Tangent(Generic[P]):
     def as_tensor(self) -> CovariantTensor[P]:
         return CovariantTensor(self.point, self.v_coords)
 
+    @staticmethod
+    def of_tensor_exn(t: Tensor[P]) -> "Tangent[P]":
+        assert_shape(t, n_cov=1, n_contra=0)
+        return Tangent(t.point, t.t_coords)
+
 
 @dataclass(frozen=True)
 class Cotangent(Generic[P]):
@@ -329,21 +356,14 @@ class Cotangent(Generic[P]):
         )
         return self.pullback(lambda p: p, image)
 
+    def inner(self, vec: Tangent[P]) -> np.ndarray:
+        """Return inner product as a 0-D array"""
+        return jnp.dot(self.v_coords, vec.v_coords)
+
     def as_tensor(self) -> ContravariantTensor[P]:
         return ContravariantTensor(self.point, self.v_coords)
 
-
-class RiemannianManifold(Manifold[P]):
-    """A Riemannian manifold equipped with a metric"""
-
-    @abc.abstractmethod
-    def metric(self, point: P) -> Tuple[np.ndarray, Chart[P]]:
-        """Compute the metric as a matrix in the specified chart at point"""
-
-    def inv_metric(self, point: P) -> Tuple[np.ndarray, Chart[P]]:
-        """Compute the inverse metric as a matrix in the specified chart at point.
-
-        The inverse metric is an operations from cotangent x cotangent -> float
-        """
-        mat, chart = self.metric(point)
-        return np.linalg.inv(mat), chart
+    @staticmethod
+    def of_tensor_exn(t: Tensor[P]) -> "Cotangent[P]":
+        assert_shape(t, n_cov=0, n_contra=1)
+        return Cotangent(t.point, t.t_coords)
