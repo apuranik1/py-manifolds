@@ -43,5 +43,8 @@ class EuclideanSpace(PseudoRiemannianManifold[EuclideanPoint]):
     def metric_in_chart(
         self, point: ChartPoint[EuclideanPoint]
     ) -> PseudoMetric[EuclideanPoint]:
-        # I think this usually does unneeded multiplication by the identity matrix
+        # 99% of the time we want the identity matrix
+        if isinstance(point.chart, IdChart):
+            return PseudoMetric(point, jnp.eye(point.coords.shape[0]))
+        # some crazy person might use a custom chart
         return super().metric_in_chart(point)

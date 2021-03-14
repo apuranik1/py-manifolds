@@ -1,7 +1,7 @@
 from typing import Sequence
 
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 
 from manifolds.euclidean import EuclideanPoint, EuclideanSpace
 from manifolds.manifold import Chart, ChartPoint

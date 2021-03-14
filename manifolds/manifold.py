@@ -311,7 +311,7 @@ class Tangent(Generic[P]):
     ) -> "Tangent[P_]":
         """Compute pushforward along a morphism, expressed in the given chart"""
 
-        def coord_map(c: np.ndarray):
+        def coord_map(c: np.ndarray) -> np.ndarray:
             return chart.point_to_coords(morphism(self.point.chart.coords_to_point(c)))
 
         image, tangent = jax.jvp(coord_map, [self.point.coords], [self.v_coords])
@@ -322,6 +322,15 @@ class Tangent(Generic[P]):
 
     def as_tensor(self) -> CovariantTensor[P]:
         return CovariantTensor(self.point, self.v_coords)
+
+    def derive(self, scalar_field: Callable[[P], float]) -> float:
+        """Take the derivative of a scalar field with respect to this tangent"""
+
+        def coord_map(c: np.ndarray) -> float:
+            return scalar_field(self.point.chart.coords_to_point(c))
+
+        # grad returns a covector
+        return jnp.dot(jax.grad(coord_map, 0), self.v_coords)
 
     @staticmethod
     def of_tensor_exn(t: Tensor[P]) -> "Tangent[P]":
@@ -347,7 +356,7 @@ class Cotangent(Generic[P]):
             )
 
         _, pullback_fun = jax.vjp(coord_map, preimage.coords)
-        cotangent = pullback_fun(self.v_coords)
+        (cotangent,) = pullback_fun(self.v_coords)
         return Cotangent(preimage, cotangent)
 
     def to_chart(self, chart: Chart[P]):
