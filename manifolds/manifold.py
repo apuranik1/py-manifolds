@@ -13,11 +13,10 @@ As many functions as possible are jit-friendly.
 
 import abc
 from dataclasses import dataclass
-from typing import Callable, Generic, Sequence, TypeVar
+from typing import Callable, Generic, Sequence, Tuple, TypeVar
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 
 from manifolds.util import assert_shape
 
@@ -37,14 +36,14 @@ class Chart(Generic[P], metaclass=abc.ABCMeta):
     """
 
     @abc.abstractmethod
-    def coords_to_point(self, coords: np.ndarray) -> P:
+    def coords_to_point(self, coords: jnp.DeviceArray) -> P:
         """Conversion from coordinates to a point in the domain.
 
         Raises OutOfDomain if the coords are not mapped to a valid point.
         """
 
     @abc.abstractmethod
-    def point_to_coords(self, point: P) -> np.ndarray:
+    def point_to_coords(self, point: P) -> jnp.DeviceArray:
         """Convert a point to coordinates in this Chart.
 
         Raises OutOfDomain if the point is not in the domain of the chart.
@@ -73,7 +72,7 @@ class Manifold(Generic[P], metaclass=abc.ABCMeta):
 class ChartPoint(Generic[P]):
     """A point in coordinates in a chart"""
 
-    coords: np.ndarray
+    coords: jnp.DeviceArray
     chart: Chart[P]
 
     @staticmethod
@@ -122,7 +121,7 @@ class Tensor(Generic[P]):
     """
 
     point: ChartPoint[P]
-    t_coords: np.ndarray
+    t_coords: jnp.DeviceArray
     n_contra: int
 
     @property
@@ -204,12 +203,12 @@ class Tensor(Generic[P]):
         indices along the inverse. It's more like a change of coordinates.
         """
 
-        def coord_map_forward(c: np.ndarray) -> np.ndarray:
+        def coord_map_forward(c: jnp.DeviceArray) -> jnp.DeviceArray:
             return chart.point_to_coords(
                 diffeo.forward(self.point.chart.coords_to_point(c))
             )
 
-        def coord_map_backward(c: np.ndarray) -> np.ndarray:
+        def coord_map_backward(c: jnp.DeviceArray) -> jnp.DeviceArray:
             return self.point.chart.point_to_coords(
                 diffeo.backward(chart.coords_to_point(c))
             )
@@ -242,14 +241,14 @@ class Tensor(Generic[P]):
 
 
 class CovariantTensor(Tensor[P]):
-    def __init__(self, point: ChartPoint[P], t_coords: np.ndarray):
+    def __init__(self, point: ChartPoint[P], t_coords: jnp.DeviceArray):
         super().__init__(point, t_coords, 0)
 
     def pushforward(
         self, morphism: Callable[[P], P_], chart: Chart[P_]
     ) -> "CovariantTensor[P_]":
         # see Tensor.diffeo_pushforward for explanation of details
-        def coord_map(c: np.ndarray) -> np.ndarray:
+        def coord_map(c: jnp.DeviceArray) -> jnp.DeviceArray:
             return chart.point_to_coords(morphism(self.point.chart.coords_to_point(c)))
 
         image = coord_map(self.point.coords)
@@ -267,7 +266,7 @@ class CovariantTensor(Tensor[P]):
 
 
 class ContravariantTensor(Tensor[P]):
-    def __init__(self, point: ChartPoint[P], t_coords: np.ndarray):
+    def __init__(self, point: ChartPoint[P], t_coords: jnp.DeviceArray):
         super().__init__(point, t_coords, len(t_coords.shape))
 
     def pullback(
@@ -280,7 +279,7 @@ class ContravariantTensor(Tensor[P]):
         """
         # see Tensor.diffeo_pushforward for explanation of details
 
-        def coord_map(c: np.ndarray) -> np.ndarray:
+        def coord_map(c: jnp.DeviceArray) -> jnp.DeviceArray:
             return self.point.chart.point_to_coords(
                 morphism(preimage.chart.coords_to_point(c))
             )
@@ -304,14 +303,14 @@ class Tangent(Generic[P]):
     """An element of the tangent bundle on a manifold in some chart"""
 
     point: ChartPoint[P]
-    v_coords: np.ndarray
+    v_coords: jnp.DeviceArray
 
     def pushforward(
         self, morphism: Callable[[P], P_], chart: Chart[P_]
     ) -> "Tangent[P_]":
         """Compute pushforward along a morphism, expressed in the given chart"""
 
-        def coord_map(c: np.ndarray) -> np.ndarray:
+        def coord_map(c: jnp.DeviceArray) -> jnp.DeviceArray:
             return chart.point_to_coords(morphism(self.point.chart.coords_to_point(c)))
 
         image, tangent = jax.jvp(coord_map, [self.point.coords], [self.v_coords])
@@ -323,14 +322,33 @@ class Tangent(Generic[P]):
     def as_tensor(self) -> CovariantTensor[P]:
         return CovariantTensor(self.point, self.v_coords)
 
-    def derive(self, scalar_field: Callable[[P], float]) -> float:
-        """Take the derivative of a scalar field with respect to this tangent"""
+    # how would you compute a derivative without autodiff?
+    # one option: finite differences
+    # non-blackbox version? The TCD of a scalar field is a covector field
+    # This doesn't need a connection or a metric.
+    # The user could define this, but it's identical to a dot product
 
-        def coord_map(c: np.ndarray) -> float:
+    def derive_autodiff(
+        self, scalar_field: Callable[[P], jnp.DeviceArray]
+    ) -> Tuple[jnp.DeviceArray, jnp.DeviceArray]:
+        """Take the derivative of a scalar field with respect to this tangent.
+
+        If scalar_field returns an array instead of a scalar, takes the derivative
+        coordinate-wise. In general this is not a covariant derivative except in
+        dimension 0.
+
+        Returns:
+          A tuple (image, derivative). The first element is the image of the scalar
+          field. The second is the derivative, as a jax array of the same shape as
+          image.
+        """
+
+        def coord_map(c: jnp.DeviceArray) -> float:
             return scalar_field(self.point.chart.coords_to_point(c))
 
-        # grad returns a covector
-        return jnp.dot(jax.grad(coord_map, 0), self.v_coords)
+        # I think this is equivalent to pushforward to Euclidean space
+        _, derivative = jax.jvp(coord_map, [self.point.coords], [self.v_coords])
+        return derivative
 
     @staticmethod
     def of_tensor_exn(t: Tensor[P]) -> "Tangent[P]":
@@ -343,14 +361,14 @@ class Cotangent(Generic[P]):
     """An element of the cotangent bundle on a manifold in some chart"""
 
     point: ChartPoint[P]
-    v_coords: np.ndarray
+    v_coords: jnp.DeviceArray
 
     def pullback(
         self, morphism: Callable[[P_], P], preimage: ChartPoint[P_]
     ) -> "Cotangent[P_]":
         """Compute pullback along a morphism in the given chart"""
 
-        def coord_map(c: np.ndarray):
+        def coord_map(c: jnp.DeviceArray):
             return self.point.chart.point_to_coords(
                 morphism(preimage.chart.coords_to_point(c))
             )
@@ -365,7 +383,7 @@ class Cotangent(Generic[P]):
         )
         return self.pullback(lambda p: p, image)
 
-    def inner(self, vec: Tangent[P]) -> np.ndarray:
+    def dot(self, vec: Tangent[P]) -> jnp.DeviceArray:
         """Return inner product as a 0-D array"""
         return jnp.dot(self.v_coords, vec.v_coords)
 

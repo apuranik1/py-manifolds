@@ -2,15 +2,14 @@ import abc
 from typing import Callable, Generic, TypeVar
 
 import jax.numpy as jnp
-import numpy as np
 
-from manifolds.manifold import ChartPoint, Tensor
+from manifolds.manifold import ChartPoint, Tangent, Tensor
 
 P = TypeVar("P")
 
 
-class Connection(Generic[P]):
-    """Connection on a manifold in a chart.
+class Christoffel(Generic[P]):
+    """Christoffel symbols at a point on a manifold.
 
     As with tensors, operations are only well-defined at the same point in the same
     chart. For performance and practicality, this condition is not checked.
@@ -21,12 +20,29 @@ class Connection(Generic[P]):
     Well, maybe we can count on it, since tensor field is always in a chart.
     """
 
-    def __init__(self, point: ChartPoint[P], coords: np.ndarray):
+    def __init__(self, point: ChartPoint[P], coords: jnp.DeviceArray):
+        """Initialize Christoffel symbols from coordinates.
+
+        Order of indices must be upper, first lower, second lower.
+        """
+        if not len(coords.shape) == 3 and coords.shape:
+            raise ValueError("Christoffel symbols require three indices")
+        a, b, c = coords.shape
+        if not a == b and a == c:
+            raise ValueError("All axes should be of equal length")
         self.point = point
         self.coords = coords
 
-    # need: directional derivative, total derivative
-    def tcd(self, tensor_field: Callable[[P], Tensor[P]]) -> Tensor[P]:
+    def directional_derivative(
+        self, direction: Tangent[P], field: Callable[[P], Tangent[P]]
+    ) -> Tangent[P]:
+        # in coordinates, D_X(Y) = (X Y^k)d_k + X_i Y_j Gamma^k_ij d_k
+        dim = direction.v_coords.shape[0]
+        field_at_point, coord_derivs = direction.derive_autodiff(field)
+        second_term = self.coords @ direction.v_coords @ field_at_point.v_coords
+        return Tangent(self.point, coord_derivs + second_term)
+
+    def tcd_autodiff(self, tensor_field: Callable[[P], Tensor[P]]) -> Tensor[P]:
         """Compute the total covariant derivative of a tensor field in the same chart.
 
         The TCD is returned as a tensor at self.point with one new contravariant index.
@@ -36,10 +52,13 @@ class Connection(Generic[P]):
           - tensor_field(p) is a tensor at p, in the same chart as self. If the chart
             may not match, use tcd_safe instead.
         """
+        # the coordinate expression for this is an explosion of product rule
+        # basically you have to differentiate every index separately, I think?
+        # probably best to start with the covariant derivative of a covector
         raise NotImplementedError()
 
-    def tcd_safe(self, tensor_field: Callable[[P], Tensor[P]]) -> Tensor[P]:
+    def tcd_autodiff_safe(self, tensor_field: Callable[[P], Tensor[P]]) -> Tensor[P]:
         """Compute total covariant derivative of a tensor field in any chart"""
-        return self.tcd(lambda p: tensor_field(p).to_chart(self.point.chart))
+        return self.tcd_autodiff(lambda p: tensor_field(p).to_chart(self.point.chart))
 
     # changing the chart of a connection is a pain, so not implementing that yet

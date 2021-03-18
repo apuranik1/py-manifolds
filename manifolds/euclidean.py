@@ -1,7 +1,6 @@
 from typing import Sequence, TypeVar
 
 import jax.numpy as jnp
-import numpy as np
 
 from manifolds.manifold import Chart, ChartPoint
 from manifolds.riemannian import PseudoMetric, PseudoRiemannianManifold
@@ -11,7 +10,7 @@ P = TypeVar("P")
 
 
 class EuclideanPoint:
-    def __init__(self, coords: np.ndarray):
+    def __init__(self, coords: jnp.DeviceArray):
         self.coords = coords
 
     @property
@@ -22,10 +21,10 @@ class EuclideanPoint:
 class IdChart(Chart[EuclideanPoint]):
     """Identity chart, mapping points to themselves"""
 
-    def point_to_coords(self, point: EuclideanPoint) -> np.ndarray:
+    def point_to_coords(self, point: EuclideanPoint) -> jnp.DeviceArray:
         return point.coords
 
-    def coords_to_point(self, coords: np.ndarray) -> EuclideanPoint:
+    def coords_to_point(self, coords: jnp.DeviceArray) -> EuclideanPoint:
         return EuclideanPoint(coords)
 
 

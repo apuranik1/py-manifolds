@@ -2,7 +2,6 @@ import abc
 from typing import Callable, TypeVar
 
 import jax.numpy as jnp
-import numpy as np
 
 from manifolds.manifold import (
     Chart,
@@ -14,6 +13,7 @@ from manifolds.manifold import (
     Tangent,
     Tensor,
 )
+from manifolds.connection import Christoffel
 from manifolds.util import assert_shape
 
 
@@ -29,7 +29,7 @@ class PseudoMetric(ContravariantTensor[P]):
     Convenience functions are provided for operations on tangent and cotangent vectors.
     """
 
-    def __init__(self, point: ChartPoint[P], coords: np.ndarray):
+    def __init__(self, point: ChartPoint[P], coords: jnp.DeviceArray):
         """Create a metric from coordinates. """
         if not len(coords.shape) == 2:
             raise ValueError("Metric must have exactly two indices")
@@ -62,7 +62,7 @@ class PseudoMetric(ContravariantTensor[P]):
         coords = jnp.linalg.inv(self.t_coords)
         return CovariantTensor(self.point, coords)
 
-    def inner(self, a: Tangent[P], b: Tangent[P]) -> np.ndarray:
+    def inner(self, a: Tangent[P], b: Tangent[P]) -> jnp.DeviceArray:
         """Compute inner product of vectors, as 0-D array"""
         return jnp.dot(a.v_coords, jnp.dot(self.t_coords, b.v_coords))
 
@@ -99,3 +99,14 @@ def metric_of_immersion(
         )
 
     return metric
+
+
+def levi_civita(
+    manifold: PseudoRiemannianManifold[P], point: ChartPoint[P]
+) -> Christoffel[P]:
+    # Compute the Levi-Civita connection for a pseudo-Riemannian manifold
+    # formula: Gamma^k_ij = 0.5 g^kl (-d_l g_ij + d_i g_jl + d_j g_il)
+    # outer multiplication is left-multiplication by inverse metric matrix
+    # inner mess requires the full jacobian of the metric
+    # which then gets transposed in unpleasant ways
+    raise NotImplementedError()
