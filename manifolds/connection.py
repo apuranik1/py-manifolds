@@ -33,6 +33,9 @@ class Christoffel(Generic[P]):
         self.point = point
         self.coords = coords
 
+    def __repr__(self) -> str:
+        return f"Christoffel({self.point}, {self.coords})"
+
     def directional_derivative(
         self, direction: Tangent[P], field: Callable[[P], Tangent[P]]
     ) -> Tangent[P]:

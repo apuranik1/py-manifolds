@@ -1,6 +1,7 @@
 import abc
 from typing import Callable, TypeVar
 
+import jax
 import jax.numpy as jnp
 
 from manifolds.manifold import (
@@ -106,7 +107,16 @@ def levi_civita(
 ) -> Christoffel[P]:
     # Compute the Levi-Civita connection for a pseudo-Riemannian manifold
     # formula: Gamma^k_ij = 0.5 g^kl (-d_l g_ij + d_i g_jl + d_j g_il)
-    # outer multiplication is left-multiplication by inverse metric matrix
-    # inner mess requires the full jacobian of the metric
-    # which then gets transposed in unpleasant ways
-    raise NotImplementedError()
+    def metric_matrix(coords: jnp.DeviceArray) -> jnp.DeviceArray:
+        return manifold.metric_in_chart(ChartPoint(coords, point.chart)).t_coords
+
+    jacobian = jax.jacfwd(metric_matrix)(point.coords)
+    # so d_a g_bc is jacobian[b, c, a]
+    # desired order of indices is l, i, j
+    # so transpose into the order l, i, j
+    dl_gij = jacobian.transpose([2, 0, 1])  # l = 2, i = 0, j = 1
+    di_gjl = jacobian.transpose([1, 2, 0])  # i = 2, j = 0, l = 1
+    dj_gli = jacobian  # j = 2, l = 0, i = 1 (already correct order)
+    inverse = manifold.metric_in_chart(point).inverse().t_coords
+    christoffel_coords = jnp.tensordot(inverse, di_gjl + dj_gli - dl_gij, axes=1)
+    return Christoffel(point, christoffel_coords)
