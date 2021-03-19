@@ -1,4 +1,4 @@
-from typing import Sequence, TypeVar
+from typing import Any, Sequence, TypeVar
 
 import jax.numpy as jnp
 
@@ -26,6 +26,13 @@ class IdChart(Chart[EuclideanPoint]):
 
     def coords_to_point(self, coords: jnp.DeviceArray) -> EuclideanPoint:
         return EuclideanPoint(coords)
+
+    def to_array(self) -> jnp.DeviceArray:
+        return jnp.array(0.)
+
+    @classmethod
+    def of_array(cls: Any, arr: jnp.DeviceArray) -> "IdChart":
+        return IdChart()
 
 
 class EuclideanSpace(PseudoRiemannianManifold[EuclideanPoint]):

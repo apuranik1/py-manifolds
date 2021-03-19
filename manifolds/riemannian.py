@@ -118,5 +118,5 @@ def levi_civita(
     di_gjl = jacobian.transpose([1, 2, 0])  # i = 2, j = 0, l = 1
     dj_gli = jacobian  # j = 2, l = 0, i = 1 (already correct order)
     inverse = manifold.metric_in_chart(point).inverse().t_coords
-    christoffel_coords = jnp.tensordot(inverse, di_gjl + dj_gli - dl_gij, axes=1)
+    christoffel_coords = 0.5 * jnp.tensordot(inverse, di_gjl + dj_gli - dl_gij, axes=1)
     return Christoffel(point, christoffel_coords)

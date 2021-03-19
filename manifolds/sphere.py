@@ -66,6 +66,14 @@ class StereographicChart(Chart[SpherePoint]):
         embed_coords = jnp.append(u, jnp.array([v]))
         return SpherePoint(embed_coords)
 
+    def to_array(self) -> jnp.DeviceArray:
+        return self.signed_radius
+
+    @classmethod
+    def of_array(cls, arr: jnp.DeviceArray) -> "StereographicChart":
+        assert arr.shape == ()
+        return StereographicChart(arr)
+
     def __repr__(self) -> str:
         return f"StereographicChart({self.signed_radius})"
 

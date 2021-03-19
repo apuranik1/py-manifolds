@@ -13,7 +13,7 @@ As many functions as possible are jit-friendly.
 
 import abc
 from dataclasses import dataclass
-from typing import Callable, Generic, Sequence, Tuple, TypeVar
+from typing import Callable, Generic, Sequence, Tuple, Type, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -28,6 +28,8 @@ P = TypeVar("P")
 class OutOfDomain(Exception):
     """Indicates that a value is outside the domain of a map"""
 
+
+T_Chart = TypeVar("T_Chart", bound="Chart")
 
 class Chart(Generic[P], metaclass=abc.ABCMeta):
     """A single chart on a manifold.
@@ -48,6 +50,17 @@ class Chart(Generic[P], metaclass=abc.ABCMeta):
 
         Raises OutOfDomain if the point is not in the domain of the chart.
         """
+
+    @classmethod
+    @abc.abstractmethod
+    def of_array(cls: Type[T_Chart], arr: jnp.DeviceArray) -> T_Chart:
+        """Deserialize an instance of this class from an array"""
+        pass
+
+    @abc.abstractmethod
+    def to_array(self) -> jnp.DeviceArray:
+        """Serialize an instance of this class as an array"""
+        pass
 
 
 class Manifold(Generic[P], metaclass=abc.ABCMeta):

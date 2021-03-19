@@ -117,12 +117,12 @@ def test_derivative() -> None:
     # derivative at north pole in direction (1, 0) proj from south is 2
     northpole = ChartPoint(jnp.array([0.0, 0.0]), south_projection())
     t1 = Tangent(northpole, jnp.array([1.0, 0.0]))
-    assert t1.derive_autodiff(x_projection).item() == pytest.approx(2.0)
+    assert t1.derive_autodiff(x_projection)[0].item() == pytest.approx(2.0)
     # derivative at north pole in direction (0, 1) proj from south is 0
     t2 = Tangent(northpole, jnp.array([0.0, 1.0]))
-    assert t2.derive_autodiff(x_projection).item() == pytest.approx(0.0)
+    assert t2.derive_autodiff(x_projection)[0].item() == pytest.approx(0.0)
     # derivative at (5, 0) in any direction is 0
     t3 = Tangent(
         ChartPoint(jnp.array([5.0, 0.0]), south_projection()), jnp.array([10.0, -6.0])
     )
-    assert t3.derive_autodiff(x_projection).item() == pytest.approx(0.0)
+    assert t3.derive_autodiff(x_projection)[0].item() == pytest.approx(0.0)
