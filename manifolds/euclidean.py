@@ -2,8 +2,8 @@ from typing import Any, Sequence, TypeVar
 
 import jax.numpy as jnp
 
-from manifolds.manifold import Chart, ChartPoint
-from manifolds.riemannian import PseudoMetric, PseudoRiemannianManifold
+from .manifold import Chart, ChartPoint
+from .riemannian import PseudoMetric, PseudoRiemannianManifold
 
 
 P = TypeVar("P")

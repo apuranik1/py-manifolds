@@ -1,9 +1,8 @@
-import abc
 from typing import Callable, Generic, TypeVar
 
 import jax.numpy as jnp
 
-from manifolds.manifold import ChartPoint, Tangent, Tensor
+from .manifold import ChartPoint, Tangent, Tensor
 
 P = TypeVar("P")
 
@@ -40,7 +39,6 @@ class Christoffel(Generic[P]):
         self, direction: Tangent[P], field: Callable[[P], Tangent[P]]
     ) -> Tangent[P]:
         # in coordinates, D_X(Y) = (X Y^k)d_k + X_i Y_j Gamma^k_ij d_k
-        dim = direction.v_coords.shape[0]
         field_at_point, coord_derivs = direction.derive_autodiff(field)
         second_term = self.coords @ direction.v_coords @ field_at_point.v_coords
         return Tangent(self.point, coord_derivs + second_term)
