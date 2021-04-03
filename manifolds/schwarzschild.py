@@ -14,7 +14,7 @@ class SchwarzschildPoint:
     """
     def __init__(self, coords: jnp.DeviceArray):
         if coords.shape[-1] != 4:
-            raise ValueError("On 4D spacetime is supported")
+            raise ValueError("Only 4D spacetime is supported")
         self.coords = coords
 
 
@@ -65,7 +65,7 @@ class SchwarzschildSpacetime(PseudoRiemannianManifold[SchwarzschildPoint]):
             a = 1. - self.radius / r  # this quantity appears twice in the metric
             time_comp = -a  # dt^2 component
             radial_comp = a ** -1  # dr^2 component
-            angular_comp = r2
+            angular_comp = 1.
             # dr = (x dx + y dy + z dz) / r
             # dr^2 = outer(space dspace, space dspace) / r^2
             dr2 = jnp.outer(spatial, spatial) / r2
