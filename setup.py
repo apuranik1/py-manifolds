@@ -1,12 +1,5 @@
 from setuptools import setup, find_packages
 
-NAME = "manifolds"
-DESCRIPTION = "Operations on manifolds"
-EMAIL = "alokpuranik1@gmail.com"
-AUTHOR = "Alok Puranik"
-REQUIRES_PYTHON = ">= 3.7.0"
-VERSION = "0.0.1"
-
 setup(
     name="manifolds",
     version="0.0.1",
@@ -15,4 +8,9 @@ setup(
     author_email="alokpuranik1@gmail.com",
     python_requires=">= 3.7.0",
     packages=find_packages(exclude=["tests"]),
+    install_requires=[
+        "jax == 0.2.10",
+        "numpy ~= 1.20",
+        "pytest ~= 6.0",
+    ],
 )

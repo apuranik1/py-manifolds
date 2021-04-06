@@ -1,7 +1,6 @@
 import jax.numpy as jnp
 import pytest
 
-# from manifolds.euclidean import EuclideanPoint, IdChart, EuclideanSpace
 from manifolds.manifold import (
     ChartPoint,
     Cotangent,
