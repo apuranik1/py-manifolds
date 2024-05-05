@@ -71,7 +71,7 @@ def make_exp_map_step(
     chart_cls: Type[Chart[P]],
 ):
     @jax.jit
-    def exp_map_step(initial_x, initial_v, chart_coords, dt) -> Tuple[jnp.DeviceArray, jnp.DeviceArray]:
+    def exp_map_step(initial_x, initial_v, chart_coords, dt) -> Tuple[jax.Array, jax.Array]:
         """Run one step of the exponential map on the sphere.
 
         The JIT optimizes out essentially all the type-system fluff, leaving only DeviceArray operations.

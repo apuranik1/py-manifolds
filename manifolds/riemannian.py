@@ -22,7 +22,7 @@ P = TypeVar("P")
 P_ = TypeVar("P_")
 
 
-class PseudoMetric(ContravariantTensor[P]):
+class PseudoMetric(CovariantTensor[P]):
     """A psuedo-Riemannian metric on a manifold. For correct semantics, coords must be
     symmetric and non-singular, but this is not verified. If coords is
     positive-definite, then this will be an true Riemannian metric.
@@ -30,7 +30,7 @@ class PseudoMetric(ContravariantTensor[P]):
     Convenience functions are provided for operations on tangent and cotangent vectors.
     """
 
-    def __init__(self, point: ChartPoint[P], coords: jnp.DeviceArray):
+    def __init__(self, point: ChartPoint[P], coords: jax.Array):
         """Create a metric from coordinates. """
         if not len(coords.shape) == 2:
             raise ValueError("Metric must have exactly two indices")
@@ -58,12 +58,12 @@ class PseudoMetric(ContravariantTensor[P]):
         coords = jnp.linalg.solve(self.t_coords, vector.v_coords)
         return Tangent(self.point, coords)
 
-    def inverse(self) -> CovariantTensor[P]:
-        """Returns a covariant 2-tensor"""
+    def inverse(self) -> ContravariantTensor[P]:
+        """Returns a contravariant 2-tensor"""
         coords = jnp.linalg.inv(self.t_coords)
-        return CovariantTensor(self.point, coords)
+        return ContravariantTensor(self.point, coords)
 
-    def inner(self, a: Tangent[P], b: Tangent[P]) -> jnp.DeviceArray:
+    def inner(self, a: Tangent[P], b: Tangent[P]) -> jax.Array:
         """Compute inner product of vectors, as 0-D array"""
         return jnp.dot(a.v_coords, jnp.dot(self.t_coords, b.v_coords))
 
@@ -107,7 +107,7 @@ def levi_civita(
 ) -> Christoffel[P]:
     # Compute the Levi-Civita connection for a pseudo-Riemannian manifold
     # formula: Gamma^k_ij = 0.5 g^kl (-d_l g_ij + d_i g_jl + d_j g_il)
-    def metric_matrix(coords: jnp.DeviceArray) -> jnp.DeviceArray:
+    def metric_matrix(coords: jax.Array) -> jax.Array:
         return manifold.metric_in_chart(ChartPoint(coords, point.chart)).t_coords
 
     jacobian = jax.jacfwd(metric_matrix)(point.coords)

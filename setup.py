@@ -9,8 +9,7 @@ setup(
     python_requires=">= 3.7.0",
     packages=find_packages(exclude=["tests"]),
     install_requires=[
-        "jax == 0.2.10",
-        "numpy ~= 1.20",
+        "jax >= 0.4.1",
         "pytest ~= 6.0",
     ],
 )

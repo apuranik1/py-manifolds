@@ -1,5 +1,6 @@
 from typing import Sequence
 
+import jax
 import jax.numpy as jnp
 from jax import ops
 
@@ -12,7 +13,7 @@ class SchwarzschildPoint:
 
     Coordinate order is (t, x, y, z) and follows the convention c = 1.
     """
-    def __init__(self, coords: jnp.DeviceArray):
+    def __init__(self, coords: jax.Array):
         if coords.shape[-1] != 4:
             raise ValueError("Only 4D spacetime is supported")
         self.coords = coords
@@ -22,20 +23,20 @@ class SchwarzschildChart(Chart[SchwarzschildPoint]):
     """Incomplete implementation of Schwarzschild spacetime charts.
     Currently no chart can cross the event horizon.
     """
-    def __init__(self, radius: jnp.DeviceArray):
+    def __init__(self, radius: jax.Array):
         self.radius = radius
 
-    def coords_to_point(self, coords: jnp.DeviceArray) -> SchwarzschildPoint:
+    def coords_to_point(self, coords: jax.Array) -> SchwarzschildPoint:
         return SchwarzschildPoint(coords)
 
-    def point_to_coords(self, point: SchwarzschildPoint) -> jnp.DeviceArray:
+    def point_to_coords(self, point: SchwarzschildPoint) -> jax.Array:
         return point.coords
 
-    def to_array(self) -> jnp.DeviceArray:
+    def to_array(self) -> jax.Array:
         return self.radius
 
     @classmethod
-    def of_array(cls, arr: jnp.DeviceArray) -> "SchwarzschildChart":
+    def of_array(cls, arr: jax.Array) -> "SchwarzschildChart":
         if not arr.shape == ():
             raise ValueError("SchwarzschildChart requires 0D radius")
         return SchwarzschildChart(arr)
@@ -46,7 +47,7 @@ class SchwarzschildSpacetime(PseudoRiemannianManifold[SchwarzschildPoint]):
 
     Partial implemention that does not cross the event horizon.
     """
-    def __init__(self, radius: jnp.DeviceArray):
+    def __init__(self, radius: jax.Array):
         self.radius = radius
 
     def preferred_chart(self, point: SchwarzschildPoint) -> Chart[SchwarzschildPoint]:

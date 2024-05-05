@@ -1,5 +1,6 @@
 from typing import Sequence
 
+import jax
 import jax.numpy as jnp
 
 from manifolds.euclidean import EuclideanPoint, EuclideanSpace
@@ -14,7 +15,7 @@ from manifolds.riemannian import (
 class SpherePoint:
     """A point on an n-sphere, represented as an embedding into R^{n+1}"""
 
-    def __init__(self, coords: jnp.DeviceArray):
+    def __init__(self, coords: jax.Array):
         self.coords = coords
 
 
@@ -24,10 +25,10 @@ class StereographicChart(Chart[SpherePoint]):
     Projects the sphere to the plane from point (0, ..., 0, signed_radius)
     """
 
-    def __init__(self, signed_radius: jnp.DeviceArray) -> None:
+    def __init__(self, signed_radius: jax.Array) -> None:
         self.signed_radius = signed_radius
 
-    def point_to_coords(self, point: SpherePoint) -> jnp.DeviceArray:
+    def point_to_coords(self, point: SpherePoint) -> jax.Array:
         (dim,) = point.coords.shape
         if dim < 2:
             raise ValueError("Sphere of dimension < 1 is not supported")
@@ -43,7 +44,7 @@ class StereographicChart(Chart[SpherePoint]):
         p = u / lam
         return p
 
-    def coords_to_point(self, coords: jnp.DeviceArray) -> SpherePoint:
+    def coords_to_point(self, coords: jax.Array) -> SpherePoint:
         (dim,) = coords.shape
         if dim < 1:
             raise ValueError("Sphere of dimension < 1 is not supported")
@@ -66,11 +67,11 @@ class StereographicChart(Chart[SpherePoint]):
         embed_coords = jnp.append(u, jnp.array([v]))
         return SpherePoint(embed_coords)
 
-    def to_array(self) -> jnp.DeviceArray:
+    def to_array(self) -> jax.Array:
         return self.signed_radius
 
     @classmethod
-    def of_array(cls, arr: jnp.DeviceArray) -> "StereographicChart":
+    def of_array(cls, arr: jax.Array) -> "StereographicChart":
         assert arr.shape == ()
         return StereographicChart(arr)
 

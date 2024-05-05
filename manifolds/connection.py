@@ -1,6 +1,6 @@
 from typing import Callable, Generic, TypeVar
 
-import jax.numpy as jnp
+import jax
 
 from .manifold import ChartPoint, Tangent, Tensor
 
@@ -19,7 +19,7 @@ class Christoffel(Generic[P]):
     Well, maybe we can count on it, since tensor field is always in a chart.
     """
 
-    def __init__(self, point: ChartPoint[P], coords: jnp.DeviceArray):
+    def __init__(self, point: ChartPoint[P], coords: jax.Array):
         """Initialize Christoffel symbols from coordinates.
 
         Order of indices must be upper, first lower, second lower.

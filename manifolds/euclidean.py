@@ -1,5 +1,6 @@
 from typing import Any, Sequence, TypeVar
 
+import jax
 import jax.numpy as jnp
 
 from .manifold import Chart, ChartPoint
@@ -10,7 +11,7 @@ P = TypeVar("P")
 
 
 class EuclideanPoint:
-    def __init__(self, coords: jnp.DeviceArray):
+    def __init__(self, coords: jax.Array):
         self.coords = coords
 
     @property
@@ -21,17 +22,17 @@ class EuclideanPoint:
 class IdChart(Chart[EuclideanPoint]):
     """Identity chart, mapping points to themselves"""
 
-    def point_to_coords(self, point: EuclideanPoint) -> jnp.DeviceArray:
+    def point_to_coords(self, point: EuclideanPoint) -> jax.Array:
         return point.coords
 
-    def coords_to_point(self, coords: jnp.DeviceArray) -> EuclideanPoint:
+    def coords_to_point(self, coords: jax.Array) -> EuclideanPoint:
         return EuclideanPoint(coords)
 
-    def to_array(self) -> jnp.DeviceArray:
+    def to_array(self) -> jax.Array:
         return jnp.array(0.)
 
     @classmethod
-    def of_array(cls: Any, arr: jnp.DeviceArray) -> "IdChart":
+    def of_array(cls: Any, arr: jax.Array) -> "IdChart":
         return IdChart()
 
 

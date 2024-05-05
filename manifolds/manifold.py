@@ -38,14 +38,14 @@ class Chart(Generic[P], metaclass=abc.ABCMeta):
     """
 
     @abc.abstractmethod
-    def coords_to_point(self, coords: jnp.DeviceArray) -> P:
+    def coords_to_point(self, coords: jax.Array) -> P:
         """Conversion from coordinates to a point in the domain.
 
         Raises OutOfDomain if the coords are not mapped to a valid point.
         """
 
     @abc.abstractmethod
-    def point_to_coords(self, point: P) -> jnp.DeviceArray:
+    def point_to_coords(self, point: P) -> jax.Array:
         """Convert a point to coordinates in this Chart.
 
         Raises OutOfDomain if the point is not in the domain of the chart.
@@ -53,12 +53,12 @@ class Chart(Generic[P], metaclass=abc.ABCMeta):
 
     @classmethod
     @abc.abstractmethod
-    def of_array(cls: Type[T_Chart], arr: jnp.DeviceArray) -> T_Chart:
+    def of_array(cls: Type[T_Chart], arr: jax.Array) -> T_Chart:
         """Deserialize an instance of this class from an array"""
         pass
 
     @abc.abstractmethod
-    def to_array(self) -> jnp.DeviceArray:
+    def to_array(self) -> jax.Array:
         """Serialize an instance of this class as an array"""
         pass
 
@@ -85,7 +85,7 @@ class Manifold(Generic[P], metaclass=abc.ABCMeta):
 class ChartPoint(Generic[P]):
     """A point in coordinates in a chart"""
 
-    coords: jnp.DeviceArray
+    coords: jax.Array
     chart: Chart[P]
 
     @staticmethod
@@ -134,7 +134,7 @@ class Tensor(Generic[P]):
     """
 
     point: ChartPoint[P]
-    t_coords: jnp.DeviceArray
+    t_coords: jax.Array
     n_contra: int
 
     @property
@@ -216,12 +216,12 @@ class Tensor(Generic[P]):
         indices along the inverse. It's more like a change of coordinates.
         """
 
-        def coord_map_forward(c: jnp.DeviceArray) -> jnp.DeviceArray:
+        def coord_map_forward(c: jax.Array) -> jax.Array:
             return chart.point_to_coords(
                 diffeo.forward(self.point.chart.coords_to_point(c))
             )
 
-        def coord_map_backward(c: jnp.DeviceArray) -> jnp.DeviceArray:
+        def coord_map_backward(c: jax.Array) -> jax.Array:
             return self.point.chart.point_to_coords(
                 diffeo.backward(chart.coords_to_point(c))
             )
@@ -253,15 +253,15 @@ class Tensor(Generic[P]):
         return self.diffeo_pushforward(ident, chart)
 
 
-class CovariantTensor(Tensor[P]):
-    def __init__(self, point: ChartPoint[P], t_coords: jnp.DeviceArray):
+class ContravariantTensor(Tensor[P]):
+    def __init__(self, point: ChartPoint[P], t_coords: jax.Array):
         super().__init__(point, t_coords, 0)
 
     def pushforward(
         self, morphism: Callable[[P], P_], chart: Chart[P_]
-    ) -> "CovariantTensor[P_]":
+    ) -> "ContravariantTensor[P_]":
         # see Tensor.diffeo_pushforward for explanation of details
-        def coord_map(c: jnp.DeviceArray) -> jnp.DeviceArray:
+        def coord_map(c: jax.Array) -> jax.Array:
             return chart.point_to_coords(morphism(self.point.chart.coords_to_point(c)))
 
         image = coord_map(self.point.coords)
@@ -271,20 +271,20 @@ class CovariantTensor(Tensor[P]):
             # we actually want left multiplication, so contract axis 1 of jacobian
             transformed_t = jnp.tensordot(transformed_t, jacobian, axes=([0], [1]))
 
-        return CovariantTensor(ChartPoint(image, chart), transformed_t)
+        return ContravariantTensor(ChartPoint(image, chart), transformed_t)
 
-    def covariant_prod(self, other: "CovariantTensor[P]") -> "CovariantTensor[P]":
+    def contravariant_prod(self, other: "ContravariantTensor[P]") -> "ContravariantTensor[P]":
         tensor = self.tensor_prod(other)
-        return CovariantTensor(tensor.point, tensor.t_coords)
+        return ContravariantTensor(tensor.point, tensor.t_coords)
 
 
-class ContravariantTensor(Tensor[P]):
-    def __init__(self, point: ChartPoint[P], t_coords: jnp.DeviceArray):
+class CovariantTensor(Tensor[P]):
+    def __init__(self, point: ChartPoint[P], t_coords: jax.Array):
         super().__init__(point, t_coords, len(t_coords.shape))
 
     def pullback(
         self, morphism: Callable[[P_], P], preimage: ChartPoint[P_]
-    ) -> "ContravariantTensor[P_]":
+    ) -> "CovariantTensor[P_]":
         """Compute a pullback of a covariant tensor along [morphism].
 
         Requires a preimage of this point to be provided. Correctness of the preimage
@@ -292,7 +292,7 @@ class ContravariantTensor(Tensor[P]):
         """
         # see Tensor.diffeo_pushforward for explanation of details
 
-        def coord_map(c: jnp.DeviceArray) -> jnp.DeviceArray:
+        def coord_map(c: jax.Array) -> jax.Array:
             return self.point.chart.point_to_coords(
                 morphism(preimage.chart.coords_to_point(c))
             )
@@ -302,13 +302,13 @@ class ContravariantTensor(Tensor[P]):
         for _ in range(self.n_contra):
             transformed_t = jnp.tensordot(transformed_t, jacobian, axes=([0], [0]))
 
-        return ContravariantTensor(preimage, transformed_t)
+        return CovariantTensor(preimage, transformed_t)
 
-    def contravariant_prod(
-        self, other: "ContravariantTensor[P]"
-    ) -> "ContravariantTensor[P]":
+    def covariant_prod(
+        self, other: "CovariantTensor[P]"
+    ) -> "CovariantTensor[P]":
         tensor = self.tensor_prod(other)
-        return ContravariantTensor(tensor.point, tensor.t_coords)
+        return CovariantTensor(tensor.point, tensor.t_coords)
 
 
 @dataclass(frozen=True)
@@ -316,14 +316,14 @@ class Tangent(Generic[P]):
     """An element of the tangent bundle on a manifold in some chart"""
 
     point: ChartPoint[P]
-    v_coords: jnp.DeviceArray
+    v_coords: jax.Array
 
     def pushforward(
         self, morphism: Callable[[P], P_], chart: Chart[P_]
     ) -> "Tangent[P_]":
         """Compute pushforward along a morphism, expressed in the given chart"""
 
-        def coord_map(c: jnp.DeviceArray) -> jnp.DeviceArray:
+        def coord_map(c: jax.Array) -> jax.Array:
             return chart.point_to_coords(morphism(self.point.chart.coords_to_point(c)))
 
         image, tangent = jax.jvp(coord_map, [self.point.coords], [self.v_coords])
@@ -342,8 +342,8 @@ class Tangent(Generic[P]):
     # The user could define this, but it's identical to a dot product
 
     def derive_autodiff(
-        self, scalar_field: Callable[[P], jnp.DeviceArray]
-    ) -> Tuple[jnp.DeviceArray, jnp.DeviceArray]:
+        self, scalar_field: Callable[[P], jax.Array]
+    ) -> Tuple[jax.Array, jax.Array]:
         """Take the derivative of a scalar field with respect to this tangent.
 
         If scalar_field returns an array instead of a scalar, takes the derivative
@@ -356,12 +356,11 @@ class Tangent(Generic[P]):
           image.
         """
 
-        def coord_map(c: jnp.DeviceArray) -> float:
+        def coord_map(c: jax.Array) -> float:
             return scalar_field(self.point.chart.coords_to_point(c))
 
         # I think this is equivalent to pushforward to Euclidean space
-        _, derivative = jax.jvp(coord_map, [self.point.coords], [self.v_coords])
-        return derivative
+        return jax.jvp(coord_map, [self.point.coords], [self.v_coords])
 
     @staticmethod
     def of_tensor_exn(t: Tensor[P]) -> "Tangent[P]":
@@ -374,14 +373,14 @@ class Cotangent(Generic[P]):
     """An element of the cotangent bundle on a manifold in some chart"""
 
     point: ChartPoint[P]
-    v_coords: jnp.DeviceArray
+    v_coords: jax.Array
 
     def pullback(
         self, morphism: Callable[[P_], P], preimage: ChartPoint[P_]
     ) -> "Cotangent[P_]":
         """Compute pullback along a morphism in the given chart"""
 
-        def coord_map(c: jnp.DeviceArray):
+        def coord_map(c: jax.Array):
             return self.point.chart.point_to_coords(
                 morphism(preimage.chart.coords_to_point(c))
             )
@@ -396,7 +395,7 @@ class Cotangent(Generic[P]):
         )
         return self.pullback(lambda p: p, image)
 
-    def dot(self, vec: Tangent[P]) -> jnp.DeviceArray:
+    def dot(self, vec: Tangent[P]) -> jax.Array:
         """Return inner product as a 0-D array"""
         return jnp.dot(self.v_coords, vec.v_coords)
 
