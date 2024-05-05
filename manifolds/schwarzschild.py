@@ -74,8 +74,8 @@ class SchwarzschildSpacetime(PseudoRiemannianManifold[SchwarzschildPoint]):
             # therefore equal to I - dr^2
             sphere_metric = jnp.eye(3) - dr2
             space_comp = radial_comp * dr2 + angular_comp * sphere_metric
-            metric = ops.index_update(jnp.zeros((4, 4)), (0, 0), time_comp)
-            metric = ops.index_update(metric, ops.index[1:4, 1:4], space_comp)
+            metric = jnp.zeros((4, 4)).at[(0, 0)].set(time_comp)
+            metric = metric.at[jnp.index_exp[1:4, 1:4]].set(space_comp)
             return PseudoMetric(point, metric)
         else:
             # some psychopath might pass their own custom chart
